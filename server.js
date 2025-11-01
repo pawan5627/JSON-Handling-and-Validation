@@ -1,98 +1,147 @@
 import express from "express";
 import bodyParser from "body-parser";
-import crypto from "crypto";
 import Ajv from "ajv";
 import fs from "fs";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 import client from "./redisClient.js";
 
 const app = express();
-const PORT = 3000;
+app.use(bodyParser.json());
 
-app.use(bodyParser.json({ limit: "5mb" }));
+// ---------- Load JSON Schema ----------
+const schema = JSON.parse(fs.readFileSync("./schema.json", "utf8"));
+const ajv = new Ajv({ allErrors: true });
 
-// Load JSON Schema
-const schema = JSON.parse(fs.readFileSync("./schema.json", "utf-8"));
-const ajv = new Ajv({ allErrors: true, strict: true });
+// ---------- Google JWT Verification ----------
+const jwks = jwksClient({
+  jwksUri: "https://www.googleapis.com/oauth2/v3/certs",
+  cache: true,
+  rateLimit: true
+});
 
-// Compile schema once
-const validate = ajv.compile(schema);
-
-// Utility: generate MD5 ETag
-function generateETag(jsonStr) {
-  return crypto.createHash("md5").update(jsonStr).digest("hex");
+function getKey(header, callback) {
+  jwks.getSigningKey(header.kid, (err, key) => {
+    if (err) return callback(err);
+    callback(null, key.getPublicKey());
+  });
 }
 
-// --------------------------- POST /plan ---------------------------
-app.post("/plan", async (req, res) => {
-  const data = req.body;
-
-  // Validate JSON against schema
-  const valid = validate(data);
-  if (!valid) {
-    return res.status(400).json({
-      errors: validate.errors.map((err) => ({
-        path: err.instancePath || "(root)",
-        message: err.message,
-      })),
-    });
+function verifyGoogleToken(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing Bearer token" });
   }
+  const token = auth.split(" ")[1];
+  jwt.verify(token, getKey, { algorithms: ["RS256"], issuer: "https://accounts.google.com" }, (err, decoded) => {
+    if (err) return res.status(401).json({ error: "Invalid token", detail: err.message });
+    req.user = decoded;
+    next();
+  });
+}
 
-  const id = data.objectId;
-  const jsonStr = JSON.stringify(data);
-  const etag = generateETag(jsonStr);
+app.use(verifyGoogleToken);
 
-  // Save in Redis
-  await client.set(id, jsonStr);
+// ---------- Utility ----------
+function genETag(obj) {
+  return crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
+}
 
-  res.setHeader("ETag", etag);
-  return res.status(201).json(data);
-});
+// ---------- CRUD + PATCH ----------
 
-// --------------------------- GET /plan/:id ---------------------------
-app.get("/plan/:id", async (req, res) => {
-  const { id } = req.params;
-  const ifNoneMatch = req.headers["if-none-match"];
+// CREATE
+app.post("/plans", async (req, res) => {
+  const plan = req.body;
+  const validate = ajv.compile(schema);
+  const valid = validate(plan);
+  if (!valid) return res.status(400).json({ errors: validate.errors });
 
-  const data = await client.get(id);
-  if (!data) {
-    return res.status(404).json({ error: "Not found" });
-  }
-
-  const etag = generateETag(data);
-
-  if (ifNoneMatch && ifNoneMatch === etag) {
-    return res.status(304).end();
-  }
-
-  res.setHeader("ETag", etag);
-  return res.status(200).send(data);
-});
-
-// --------------------------- GET /plan ---------------------------
-app.get("/plan", async (req, res) => {
-  const keys = await client.keys("*");
-  const allPlans = [];
-  for (const key of keys) {
-    const plan = await client.get(key);
-    allPlans.push(JSON.parse(plan));
-  }
-  res.json(allPlans);
-});
-
-// --------------------------- DELETE /plan/:id ---------------------------
-app.delete("/plan/:id", async (req, res) => {
-  const { id } = req.params;
-
+  const id = plan.objectId;
   const exists = await client.exists(id);
-  if (!exists) {
-    return res.status(404).json({ error: "Not found" });
+  if (exists) return res.status(409).json({ error: "Already exists" });
+
+  await client.set(id, JSON.stringify(plan));
+  const etag = genETag(plan);
+  res.set("ETag", etag).status(201).json(plan);
+});
+
+// READ with If-None-Match
+app.get("/plans/:id", async (req, res) => {
+  const data = await client.get(req.params.id);
+  if (!data) return res.status(404).json({ error: "Not found" });
+  const obj = JSON.parse(data);
+  const etag = genETag(obj);
+
+  if (req.headers["if-none-match"] === etag) return res.status(304).end();
+
+  res.set("ETag", etag).json(obj);
+});
+
+// PUT (replace)
+app.put("/plans/:id", async (req, res) => {
+  const id = req.params.id;
+  const existingRaw = await client.get(id);
+  if (!existingRaw) return res.status(404).json({ error: "Not found" });
+  const existing = JSON.parse(existingRaw);
+
+  const ifMatch = req.headers["if-match"];
+  if (ifMatch && ifMatch !== genETag(existing)) {
+    return res.status(412).json({ error: "ETag mismatch" });
   }
 
-  await client.del(id);
-  return res.status(204).end();
+  const validate = ajv.compile(schema);
+  const valid = validate(req.body);
+  if (!valid) return res.status(400).json({ errors: validate.errors });
+
+  await client.set(id, JSON.stringify(req.body));
+  const newEtag = genETag(req.body);
+  res.set("ETag", newEtag).json(req.body);
 });
 
-// --------------------------- Start Server ---------------------------
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+// PATCH (merge)
+app.patch("/plans/:id", async (req, res) => {
+  const id = req.params.id;
+  const existingRaw = await client.get(id);
+  if (!existingRaw) return res.status(404).json({ error: "Not found" });
+
+  const existing = JSON.parse(existingRaw);
+  const ifMatch = req.headers["if-match"];
+  if (ifMatch && ifMatch !== genETag(existing)) {
+    return res.status(412).json({ error: "ETag mismatch" });
+  }
+
+  const merged = { ...existing, ...req.body };
+  const validate = ajv.compile(schema);
+  const valid = validate(merged);
+  if (!valid) return res.status(400).json({ errors: validate.errors });
+
+  await client.set(id, JSON.stringify(merged));
+  const newEtag = genETag(merged);
+  res.set("ETag", newEtag).json(merged);
 });
+
+// DELETE
+app.delete("/plans/:id", async (req, res) => {
+  const del = await client.del(req.params.id);
+  if (!del) return res.status(404).json({ error: "Not found" });
+  res.status(204).end();
+});
+
+// ---------- Conditional Example ----------
+app.get("/plans/:id/conditional", async (req, res) => {
+  const data = await client.get(req.params.id);
+  if (!data) return res.status(404).json({ error: "Not found" });
+  const obj = JSON.parse(data);
+
+  if (req.query.requireType && obj.objectType !== req.query.requireType) {
+    return res.status(412).json({ error: "Condition not met" });
+  }
+
+  res.json(obj);
+});
+
+// ---------- Server ----------
+app.get("/", (req, res) => res.send("Demo 2 API running ✅ (use /plans endpoints)"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
