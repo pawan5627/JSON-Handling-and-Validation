@@ -45,7 +45,7 @@ app.use(verifyGoogleToken);
 
 // ---------- Utility ----------
 function genETag(obj) {
-  return crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
+  return crypto.createHash("md5").update(JSON.stringify(obj)).digest("hex");
 }
 
 // ---------- CRUD + PATCH ----------
