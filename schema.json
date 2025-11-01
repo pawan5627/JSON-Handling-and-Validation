@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Plan",
+  "type": "object",
+  "required": ["objectId", "objectType", "planCostShares", "linkedPlanServices"],
+  "properties": {
+    "_org": { "type": "string" },
+    "objectId": { "type": "string" },
+    "objectType": { "type": "string" },
+    "planType": { "type": "string" },
+    "creationDate": { "type": "string" },
+    "planCostShares": {
+      "type": "object",
+      "required": ["deductible", "copay", "objectId", "objectType"],
+      "properties": {
+        "_org": { "type": "string" },
+        "deductible": { "type": "integer" },
+        "copay": { "type": "integer" },
+        "objectId": { "type": "string" },
+        "objectType": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "linkedPlanServices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["linkedService", "planserviceCostShares", "objectId", "objectType"],
+        "properties": {
+          "_org": { "type": "string" },
+          "objectId": { "type": "string" },
+          "objectType": { "type": "string" },
+          "linkedService": {
+            "type": "object",
+            "required": ["name", "objectId", "objectType"],
+            "properties": {
+              "_org": { "type": "string" },
+              "name": { "type": "string" },
+              "objectId": { "type": "string" },
+              "objectType": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "planserviceCostShares": {
+            "type": "object",
+            "required": ["deductible", "copay", "objectId", "objectType"],
+            "properties": {
+              "_org": { "type": "string" },
+              "deductible": { "type": "integer" },
+              "copay": { "type": "integer" },
+              "objectId": { "type": "string" },
+              "objectType": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
