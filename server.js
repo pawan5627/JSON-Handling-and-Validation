@@ -7,13 +7,22 @@ import jwt from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import client from "./redisClient.js";
 import esClient from "./elasticClient.js";
+import protobuf from "protobufjs";
+import cors from "cors";
+
+
 
 const app = express();
 app.use(bodyParser.json({ limit: "5mb" }));
-
+app.use(cors()); // allow all origins for development
 // ---------- Load JSON Schema ----------
 const schema = JSON.parse(fs.readFileSync("./schema.json", "utf8"));
 const ajv = new Ajv({ allErrors: true });
+
+
+// Load plan.proto
+const root = await protobuf.load("./plan.proto");
+const PlanMessage = root.lookupType("Plan");
 
 // ---------- Google JWT Verification ----------
 const jwks = jwksClient({
@@ -88,7 +97,17 @@ app.get("/plans/:id", async (req, res) => {
 
   if (req.headers["if-none-match"] === etag) return res.status(304).end();
 
-  res.set("ETag", etag).json(obj);
+  res.set("ETag", etag);
+
+  // Check if client wants protobuf
+  if (req.headers["accept"] === "application/x-protobuf") {
+    const message = PlanMessage.create(obj);
+    const buffer = PlanMessage.encode(message).finish();
+    res.setHeader("Content-Type", "application/x-protobuf");
+    return res.send(buffer);
+  }
+
+  res.json(obj);
 });
 
 // PUT (replace)

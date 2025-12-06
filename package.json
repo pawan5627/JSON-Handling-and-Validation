@@ -3,6 +3,7 @@
     "@elastic/elasticsearch": "^9.2.0",
     "ajv": "^8.17.1",
     "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
