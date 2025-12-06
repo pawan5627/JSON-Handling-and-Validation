@@ -1,7 +1,8 @@
 {
   "dependencies": {
-    "@elastic/elasticsearch": "^9.2.0",
+    "@elastic/elasticsearch": "^8.19.1",
     "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",

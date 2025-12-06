@@ -1,29 +1,51 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import PlanCard from "./components/PlanCard";
+import PlanList from "./components/PlanList";
+import PlanForm from "./components/PlanForm";
 
 function App() {
+  const [token, setToken] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [editingPlan, setEditingPlan] = useState(null);
 
+  // Google Auth button
   useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const res = await axios.get("http://localhost:3000/plans"); // change port if your backend differs
-        setPlans(res.data);
-      } catch (err) {
-        console.error("Error fetching plans:", err);
-      }
-    };
-
-    fetchPlans();
+    window.google.accounts.id.initialize({
+      client_id: "222590128873-3tkgkcrvilv6ms03hnf7tei731eoiisc.apps.googleusercontent.com", // replace with your client ID
+      callback: (response) => setToken(response.credential),
+    });
+    window.google.accounts.id.renderButton(document.getElementById("googleSignIn"), {
+      theme: "outline",
+      size: "large",
+    });
   }, []);
 
+  // Fetch plans from backend
+  const fetchPlans = () => {
+    if (token) {
+      axios
+        .get("http://localhost:3000/plans", { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setPlans(Array.isArray(res.data) ? res.data : [res.data]))
+        .catch(err => console.error(err));
+    }
+  };
+
+  useEffect(() => { fetchPlans(); }, [token]);
+
+  if (!token) return <div id="googleSignIn"></div>;
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h1>Plans Viewer</h1>
-      {plans.map(plan => (
-        <PlanCard key={plan.objectId} plan={plan} />
-      ))}
+    <div style={{ padding: "20px" }}>
+      <h1>Plans Dashboard</h1>
+      <button onClick={() => setEditingPlan({})}>Add Plan</button>
+      {editingPlan && (
+        <PlanForm
+          token={token}
+          plan={editingPlan}
+          onClose={() => { setEditingPlan(null); fetchPlans(); }}
+        />
+      )}
+      <PlanList plans={plans} onEdit={setEditingPlan} token={token} refresh={fetchPlans} />
     </div>
   );
 }

@@ -9,6 +9,9 @@ import client from "./redisClient.js";
 import esClient from "./elasticClient.js";
 import protobuf from "protobufjs";
 import cors from "cors";
+import addFormats from "ajv-formats";
+
+  // <-- this enables 'date-time', 'email', etc.
 
 
 
@@ -18,7 +21,7 @@ app.use(cors()); // allow all origins for development
 // ---------- Load JSON Schema ----------
 const schema = JSON.parse(fs.readFileSync("./schema.json", "utf8"));
 const ajv = new Ajv({ allErrors: true });
-
+addFormats(ajv);
 
 // Load plan.proto
 const root = await protobuf.load("./plan.proto");
