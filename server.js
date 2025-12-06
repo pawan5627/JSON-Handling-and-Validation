@@ -6,9 +6,10 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import client from "./redisClient.js";
+import esClient from "./elasticClient.js";
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "5mb" }));
 
 // ---------- Load JSON Schema ----------
 const schema = JSON.parse(fs.readFileSync("./schema.json", "utf8"));
@@ -61,7 +62,19 @@ app.post("/plans", async (req, res) => {
   const exists = await client.exists(id);
   if (exists) return res.status(409).json({ error: "Already exists" });
 
+  // Save in Redis
   await client.set(id, JSON.stringify(plan));
+
+  // Save in Elastic
+  await esClient.index({
+    index: "plans",
+    id: id,
+    document: {
+      ...plan,
+      join: "plan" // parent
+    }
+  });
+
   const etag = genETag(plan);
   res.set("ETag", etag).status(201).json(plan);
 });
@@ -95,6 +108,17 @@ app.put("/plans/:id", async (req, res) => {
   if (!valid) return res.status(400).json({ errors: validate.errors });
 
   await client.set(id, JSON.stringify(req.body));
+
+  // Update Elastic
+  await esClient.update({
+    index: "plans",
+    id: id,
+    doc: {
+      ...req.body,
+      join: "plan"
+    }
+  });
+
   const newEtag = genETag(req.body);
   res.set("ETag", newEtag).json(req.body);
 });
@@ -117,6 +141,17 @@ app.patch("/plans/:id", async (req, res) => {
   if (!valid) return res.status(400).json({ errors: validate.errors });
 
   await client.set(id, JSON.stringify(merged));
+
+  // Update Elastic
+  await esClient.update({
+    index: "plans",
+    id: id,
+    doc: {
+      ...merged,
+      join: "plan"
+    }
+  });
+
   const newEtag = genETag(merged);
   res.set("ETag", newEtag).json(merged);
 });
@@ -125,7 +160,31 @@ app.patch("/plans/:id", async (req, res) => {
 app.delete("/plans/:id", async (req, res) => {
   const del = await client.del(req.params.id);
   if (!del) return res.status(404).json({ error: "Not found" });
+
+  // Delete from Elastic
+  await esClient.delete({
+    index: "plans",
+    id: req.params.id
+  });
+
   res.status(204).end();
+});
+
+// ---------- Optional Search: Parent-Child ----------
+app.get("/plans/search/:serviceName", async (req, res) => {
+  const { serviceName } = req.params;
+  const result = await esClient.search({
+    index: "plans",
+    query: {
+      nested: {
+        path: "linkedPlanServices",
+        query: {
+          match: { "linkedPlanServices.linkedService.name": serviceName }
+        }
+      }
+    }
+  });
+  res.json(result.hits.hits.map(hit => hit._source));
 });
 
 // ---------- Conditional Example ----------
@@ -141,7 +200,8 @@ app.get("/plans/:id/conditional", async (req, res) => {
   res.json(obj);
 });
 
-// ---------- Server ----------
-app.get("/", (req, res) => res.send("Demo 2 API running ✅ (use /plans endpoints)"));
+// ---------- Root ----------
+app.get("/", (req, res) => res.send("Demo 2 + Phase 2 API running ✅ (use /plans endpoints)"));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
