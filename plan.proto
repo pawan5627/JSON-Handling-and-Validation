@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package demo3;
+
+// ---------- Plan Root ----------
+message Plan {
+  string _org = 1;
+  string objectId = 2;
+  string objectType = 3; // "plan"
+  string planType = 4;
+  string creationDate = 5; // ISO 8601 string
+  CostShare planCostShares = 6;
+  repeated LinkedPlanService linkedPlanServices = 7;
+}
+
+// ---------- Cost Share ----------
+message CostShare {
+  string _org = 1;
+  int32 deductible = 2;
+  int32 copay = 3;
+  string objectId = 4;
+  string objectType = 5; // "membercostshare" or "planservicecostshare"
+}
+
+// ---------- Linked Plan Service ----------
+message LinkedPlanService {
+  string _org = 1;
+  string objectId = 2;
+  string objectType = 3; // "planservice"
+  Service linkedService = 4;
+  CostShare planserviceCostShares = 5;
+}
+
+// ---------- Linked Service ----------
+message Service {
+  string _org = 1;
+  string name = 2;
+  string objectId = 3;
+  string objectType = 4; // "service"
+}

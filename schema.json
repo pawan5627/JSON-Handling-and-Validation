@@ -6,9 +6,15 @@
   "properties": {
     "_org": { "type": "string" },
     "objectId": { "type": "string" },
-    "objectType": { "type": "string" },
+    "objectType": { 
+      "type": "string",
+      "enum": ["plan"]
+    },
     "planType": { "type": "string" },
-    "creationDate": { "type": "string" },
+    "creationDate": { 
+      "type": "string",
+      "format": "date-time"
+    },
     "planCostShares": {
       "type": "object",
       "required": ["deductible", "copay", "objectId", "objectType"],
@@ -17,19 +23,26 @@
         "deductible": { "type": "integer" },
         "copay": { "type": "integer" },
         "objectId": { "type": "string" },
-        "objectType": { "type": "string" }
+        "objectType": { 
+          "type": "string",
+          "enum": ["membercostshare"]
+        }
       },
       "additionalProperties": false
     },
     "linkedPlanServices": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["linkedService", "planserviceCostShares", "objectId", "objectType"],
         "properties": {
           "_org": { "type": "string" },
           "objectId": { "type": "string" },
-          "objectType": { "type": "string" },
+          "objectType": { 
+            "type": "string",
+            "enum": ["planservice"]
+          },
           "linkedService": {
             "type": "object",
             "required": ["name", "objectId", "objectType"],
@@ -37,7 +50,10 @@
               "_org": { "type": "string" },
               "name": { "type": "string" },
               "objectId": { "type": "string" },
-              "objectType": { "type": "string" }
+              "objectType": { 
+                "type": "string",
+                "enum": ["service"]
+              }
             },
             "additionalProperties": false
           },
@@ -49,7 +65,10 @@
               "deductible": { "type": "integer" },
               "copay": { "type": "integer" },
               "objectId": { "type": "string" },
-              "objectType": { "type": "string" }
+              "objectType": { 
+                "type": "string",
+                "enum": ["planservicecostshare"]
+              }
             },
             "additionalProperties": false
           }
