@@ -1,0 +1,69 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs / editors
+.idea/
+.vscode/
+*.iml
+
+# Java / Scala / Gradle / Maven / SBT
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.mvn/
+.maven/
+.gradle/
+.gradle-cache/
+.ensime_cache
+*.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+env/
+.venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Logs and temp
+*.log
+*.tmp
+*.pid
+tmp/
+temp/
+
+# Data (ignore large/output data files)
+*.csv
+*.parquet
+*.avro
+*.orc
+*.snappy
+data/
+output/
+
+# Credentials / environment
+.env
+*.pem
+*.key
+
+# Other
+coverage/
+reports/
+.DS_Store
