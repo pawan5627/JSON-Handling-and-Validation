@@ -67,3 +67,4 @@ output/
 coverage/
 reports/
 .DS_Store
+node_modules/.package-lock.json
