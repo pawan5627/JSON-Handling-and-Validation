@@ -18,6 +18,44 @@ function PlanList({ plans }) {
                 </li>
               ))}
             </ul>
+            <button
+              onClick={async () => {
+                // Simple demo patch: increment first linked service copay by 1
+                if (!plan.linkedPlanServices || plan.linkedPlanServices.length === 0) return;
+                const updated = { ...plan };
+                updated.linkedPlanServices = updated.linkedPlanServices.map((s, idx) => {
+                  if (idx === 0) {
+                    return {
+                      ...s,
+                      planserviceCostShares: {
+                        ...s.planserviceCostShares,
+                        copay: (s.planserviceCostShares.copay || 0) + 1
+                      }
+                    };
+                  }
+                  return s;
+                });
+
+                try {
+                  const res = await fetch(`/plans/${plan.objectId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updated)
+                  });
+                  if (res.ok) {
+                    window.location.reload();
+                  } else {
+                    const err = await res.json();
+                    alert("Patch failed: " + JSON.stringify(err));
+                  }
+                } catch (err) {
+                  console.error(err);
+                  alert("Network error");
+                }
+              }}
+            >
+              Quick Patch (inc copay)
+            </button>
           </li>
         ))}
       </ul>

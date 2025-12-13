@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import PlanList from "./components/PlanList";
 import PlanForm from "./components/PlanForm";
+import RabbitEvents from "./components/RabbitEvents";
+import RabbitDashboard from "./components/RabbitDashboard";
 
 function App() {
   const [token, setToken] = useState(null);
@@ -46,6 +48,8 @@ function App() {
         />
       )}
       <PlanList plans={plans} onEdit={setEditingPlan} token={token} refresh={fetchPlans} />
+      <RabbitEvents />
+      <RabbitDashboard />
     </div>
   );
 }

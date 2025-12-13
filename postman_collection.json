@@ -1,0 +1,98 @@
+{
+  "info": {
+    "name": "Plans API - Demo",
+    "_postman_id": "plans-api-demo",
+    "description": "Collection for the Plans API (CRUD + search + SSE) — import into Postman. Set variables: baseUrl, token (optional).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "planId", "value": "plan-1" }
+  ],
+  "item": [
+    {
+      "name": "Create Plan (POST /plans)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/plans", "host": ["{{baseUrl}}"], "path": ["plans"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"objectId\": \"plan-1\",\n  \"objectType\": \"plan\",\n  \"creationDate\": \"2025-12-01T12:00:00Z\",\n  \"planCostShares\": {\n    \"objectId\": \"pcs-1\",\n    \"objectType\": \"membercostshare\",\n    \"deductible\": 100,\n    \"copay\": 10\n  },\n  \"linkedPlanServices\": [\n    {\n      \"objectId\": \"svc-1\",\n      \"objectType\": \"planservice\",\n      \"linkedService\": {\n        \"objectId\": \"service-1\",\n        \"objectType\": \"service\",\n        \"name\": \"Acme Service\"\n      },\n      \"planserviceCostShares\": {\n        \"objectId\": \"psc-1\",\n        \"objectType\": \"planservicecostshare\",\n        \"deductible\": 20,\n        \"copay\": 5\n      }\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Get Plan (GET /plans/:id)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/plans/{{planId}}", "host": ["{{baseUrl}}"], "path": ["plans","{{planId}}"] }
+      }
+    },
+    {
+      "name": "Put Plan (PUT /plans/:id) - replace",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/plans/{{planId}}", "host": ["{{baseUrl}}"], "path": ["plans","{{planId}}"] },
+        "body": {"mode":"raw","raw":"{\n  \"objectId\": \"plan-1\",\n  \"objectType\": \"plan\",\n  \"creationDate\": \"2025-12-01T12:00:00Z\",\n  \"planCostShares\": {\n    \"objectId\": \"pcs-1\",\n    \"objectType\": \"membercostshare\",\n    \"deductible\": 200,\n    \"copay\": 20\n  },\n  \"linkedPlanServices\": []\n}" }
+      }
+    },
+    {
+      "name": "Patch Plan (PATCH /plans/:id) - merge",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/plans/{{planId}}", "host": ["{{baseUrl}}"], "path": ["plans","{{planId}}"] },
+        "body": {"mode":"raw","raw":"{ \"planType\": \"silver\" }" }
+      }
+    },
+    {
+      "name": "Delete Plan (DELETE /plans/:id)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/plans/{{planId}}", "host": ["{{baseUrl}}"], "path": ["plans","{{planId}}"] }
+      }
+    },
+    {
+      "name": "Search by Service Name (GET /plans/search/:serviceName)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{baseUrl}}/plans/search/Acme%20Service", "host": ["{{baseUrl}}"], "path": ["plans","search","Acme%20Service"] }
+      }
+    },
+    {
+      "name": "Conditional GET Example (GET /plans/:id/conditional?requireType=plan)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{baseUrl}}/plans/{{planId}}/conditional?requireType=plan", "host": ["{{baseUrl}}"], "path": ["plans","{{planId}}","conditional"], "query": [ { "key": "requireType", "value": "plan" } ] }
+      }
+    },
+    {
+      "name": "SSE Events (GET /events) - open once to stream events",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/events", "host": ["{{baseUrl}}"], "path": ["events"] }
+      }
+    }
+  ]
+}

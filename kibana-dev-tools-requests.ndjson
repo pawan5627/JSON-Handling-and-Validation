@@ -1,0 +1,124 @@
+{"version":"1.0.0","type":"request","title":"1. CREATE INDEX - plans with parent-child mapping","description":"Create the plans index with a join field mapping (plan -> planservice, service, membercostshare) and a tolerant creationDate. Run this first.","method":"PUT","url":"http://localhost:9200/plans","body":{
+  "settings": { "number_of_shards": 1 },
+  "mappings": {
+    "properties": {
+      "join_field": {
+        "type": "join",
+        "relations": { "plan": ["planservice","service","membercostshare"] }
+      },
+      "objectId": { "type": "keyword" },
+      "objectType": { "type": "keyword" },
+      "creationDate": { "type": "date", "ignore_malformed": true },
+      "planCostShares": {
+        "properties": {
+          "objectId": { "type": "keyword" },
+          "objectType": { "type": "keyword" },
+          "deductible": { "type": "double" },
+          "copay": { "type": "double" }
+        }
+      },
+      "linkedService": {
+        "properties": {
+          "objectId": { "type": "keyword" },
+          "objectType": { "type": "keyword" },
+          "name": { "type": "text" }
+        }
+      },
+      "planserviceCostShares": {
+        "properties": {
+          "objectId": { "type": "keyword" },
+          "objectType": { "type": "keyword" },
+          "deductible": { "type": "double" },
+          "copay": { "type": "double" }
+        }
+      }
+    }
+  }
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"2. INDEX PARENT - sample plan (parent)","description":"Index a parent document. Use routing equal to the parent id so children will be co-located on the same shard.","method":"PUT","url":"http://localhost:9200/plans/_doc/plan-1?routing=plan-1","body":{
+  "objectId": "plan-1",
+  "objectType": "plan",
+  "creationDate": "2023-01-01T00:00:00Z",
+  "planCostShares": { "objectId": "plan-1", "objectType": "membercostshare", "deductible": 500, "copay": 20 },
+  "join_field": "plan"
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"3. INDEX CHILD - sample planservice (child)","description":"Index a child document (planservice). The child document's join_field must be an object with name and parent. Provide routing equal to the parent id.","method":"PUT","url":"http://localhost:9200/plans/_doc/plan-1_child-1?routing=plan-1","body":{
+  "objectId": "plan-1_child-1",
+  "objectType": "planservice",
+  "linkedService": { "objectId": "svc-1", "objectType": "service", "name": "Yearly physical" },
+  "planserviceCostShares": { "objectId": "ps-1", "objectType": "membercostshare", "deductible": 10, "copay": 0 },
+  "join_field": { "name": "planservice", "parent": "plan-1" }
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"4. GET PARENT (verify)","description":"Retrieve the parent document to verify it exists.","method":"GET","url":"http://localhost:9200/plans/_doc/plan-1?routing=plan-1","body":null,"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"5. GET CHILD (verify)","description":"Retrieve the child document to verify it exists.","method":"GET","url":"http://localhost:9200/plans/_doc/plan-1_child-1?routing=plan-1","body":null,"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"6. SEARCH - find children of a parent","description":"Use has_parent query to find children that belong to a specific parent id.","method":"GET","url":"http://localhost:9200/plans/_search","body":{
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "objectType": "planservice" }},
+        { "has_parent": { "parent_type": "plan", "query": { "term": { "objectId": "plan-1" } } } }
+      ]
+    }
+  }
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"7. SEARCH - find parent with children (join) example","description":"Example of retrieving parent and inner hits for children using has_child.","method":"GET","url":"http://localhost:9200/plans/_search","body":{
+  "query": {
+    "has_child": {
+      "type": "planservice",
+      "query": { "match": { "linkedService.name": "Yearly" } },
+      "inner_hits": {}
+    }
+  }
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"8. BULK - index parent + children (NDJSON)","description":"Bulk NDJSON to index a parent and two children in one request. When executing in Kibana Console, paste only the body (the NDJSON content) into the Console and run POST _bulk?refresh=true with header Content-Type: application/x-ndjson. The bulk body below ends with a newline as required.","method":"POST","url":"http://localhost:9200/_bulk?refresh=true","body":"{ \"index\": { \"_index\": \"plans\", \"_id\": \"plan-bulk-1\", \"routing\":\"plan-bulk-1\" } }\n{ \"objectId\":\"plan-bulk-1\",\"objectType\":\"plan\",\"creationDate\":\"2023-01-01T00:00:00Z\",\"planCostShares\":{\"deductible\":100,\"copay\":10},\"join_field\":\"plan\" }\n{ \"index\": { \"_index\": \"plans\", \"_id\": \"plan-bulk-1_child-a\", \"routing\":\"plan-bulk-1\" } }\n{ \"objectId\":\"plan-bulk-1_child-a\",\"objectType\":\"planservice\",\"linkedService\":{\"name\":\"Preventive Care\"},\"planserviceCostShares\":{\"deductible\":0,\"copay\":0},\"join_field\":{\"name\":\"planservice\",\"parent\":\"plan-bulk-1\"} }\n{ \"index\": { \"_index\": \"plans\", \"_id\": \"plan-bulk-1_child-b\", \"routing\":\"plan-bulk-1\" } }\n{ \"objectId\":\"plan-bulk-1_child-b\",\"objectType\":\"planservice\",\"linkedService\":{\"name\":\"Well baby\"},\"planserviceCostShares\":{\"deductible\":0,\"copay\":5},\"join_field\":{\"name\":\"planservice\",\"parent\":\"plan-bulk-1\"} }\n","headers":{"Content-Type":"application/x-ndjson"}}
+
+{"version":"1.0.0","type":"request","title":"9. INFO - index stats","description":"Show statistics for the plans index including total documents and index size.","method":"GET","url":"http://localhost:9200/plans/_stats","body":null,"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"10. MAPPING - view current index mapping","description":"Inspect the current mapping of the plans index to verify join_field and field types.","method":"GET","url":"http://localhost:9200/plans/_mapping","body":null,"headers":{"Content-Type":"application/json"}}
+{"version":"1.0.0","type":"request","title":"11. SEARCH - has_parent for specific plan id","description":"Find child documents (planservice) that have a parent of type 'plan' and a specific parent objectId. Useful to list all services under one plan.","method":"GET","url":"http://localhost:9200/plans/_search","body":{
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "objectType": "planservice" }},
+        { "has_parent": { "parent_type": "plan", "query": { "term": { "objectId": "plan-1" } } } }
+      ]
+    }
+  },
+  "sort": [ { "objectId": "asc" } ]
+},"headers":{"Content-Type":"application/json"}}
+{"version":"1.0.0","type":"request","title":"11. SEARCH demo - has_child range (copay >= 1)","description":"Example (from screenshot) that queries the `demo` index using has_child for type `planServiceCostShares` and a range on `copay`.","method":"GET","url":"http://localhost:9200/demo/_search?pretty=true","body":{
+  "query": {
+    "has_child": {
+      "type": "planServiceCostShares",
+      "query": {
+        "range": {
+          "copay": { "gte": 1 }
+        }
+      }
+    }
+  }
+},"headers":{"Content-Type":"application/json"}}
+
+{"version":"1.0.0","type":"request","title":"12. SEARCH demo - has_parent (parent_type: plan)","description":"Example (from screenshot) that queries the `demo` index to find documents with a parent of type `plan`.","method":"GET","url":"http://localhost:9200/demo/_search?pretty=true","body":{
+  "query": {
+    "has_parent": {
+      "parent_type": "plan",
+      "query": { "match_all": {} }
+    }
+  }
+},"headers":{"Content-Type":"application/json"}}
+
+/*
+Notes:
+- Use routing equal to the parent id for both parent and all its children. This ensures parent and children are stored on the same shard which is required for join queries.
+- For single PUT requests you can include the ?routing=parent-id query parameter as shown.
+- For the bulk API, include a routing property in each action line (as shown) or set a default routing per request header.
+- To run in Kibana Console: paste each request object body or use the NDJSON bulk body for the bulk request. For the bulk request, execute the POST to _bulk with header Content-Type: application/x-ndjson and paste only the raw NDJSON body into the request body.
+*/
